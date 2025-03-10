@@ -44,10 +44,10 @@ class CxTowerCommandExecuteWizard(models.TransientModel):
         column2="tag_id",
         string="Tags",
     )
-    use_sudo = fields.Selection(
+    use_sudo = fields.Boolean(
         string="Use sudo",
-        selection=[("n", "Sudo without password"), ("p", "Sudo with password")],
-        help="Run commands using 'sudo'",
+        help="Will use sudo based on server settings."
+        "If no sudo is configured will run without sudo",
     )
     code = fields.Text(compute="_compute_code", readonly=False, store=True)
     applicability = fields.Selection(
@@ -175,9 +175,20 @@ class CxTowerCommandExecuteWizard(models.TransientModel):
             "context": context,
         }
 
+    def _check_sudo_mode_match(self):
+        """
+        Checks that the wizard's sudo mode matches the server configuration.
+        """
+        for server in self.server_ids:
+            if self.use_sudo != bool(server.use_sudo):
+                raise ValidationError(
+                    _(f"Sudo mode doesn't match for server {server.name}.")
+                )
+
     def execute_command_on_server(self):
         """Render selected command rendered using server method"""
 
+        self._check_sudo_mode_match()
         # Check if command is selected
         if not self.command_id:
             raise ValidationError(_("Please select a command to execute"))
@@ -191,7 +202,7 @@ class CxTowerCommandExecuteWizard(models.TransientModel):
         for server in self.server_ids:
             server.execute_command(
                 self.command_id,
-                sudo=self.use_sudo,
+                sudo=server.use_sudo,
                 path=path_value,
                 **custom_values,
             )
@@ -208,6 +219,7 @@ class CxTowerCommandExecuteWizard(models.TransientModel):
         """
         Executes a given code as is in wizard
         """
+        self._check_sudo_mode_match()
         # Check if multiple servers are selected
         if len(self.server_ids) > 1:
             raise ValidationError(
@@ -272,7 +284,7 @@ class CxTowerCommandExecuteWizard(models.TransientModel):
                     server._get_ssh_client(raise_on_error=True),
                     self.rendered_code,
                     self.path or None,
-                    sudo=self.use_sudo if self.use_sudo else None,
+                    sudo=server.use_sudo if server.use_sudo else None,
                     **kwargs,
                 )
             command_error = command_result["error"]
