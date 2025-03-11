@@ -179,7 +179,13 @@ class CxTowerCommandExecuteWizard(models.TransientModel):
         """
         Checks that the wizard's sudo mode matches the server configuration.
         """
-        for server in self.server_ids:
+        # If the user is in the 'group_user', use sudo rights to read the 'use_sudo'
+        # field since it's normally restricted to 'group_manager'.
+        if self.env.user.has_group("cetmix_tower_server.group_user"):
+            servers = self.server_ids.sudo()
+        else:
+            servers = self.server_ids
+        for server in servers:
             if self.use_sudo != bool(server.use_sudo):
                 raise ValidationError(
                     _(f"Sudo mode doesn't match for server {server.name}.")
