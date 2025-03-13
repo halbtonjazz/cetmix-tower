@@ -730,6 +730,14 @@ class CxTowerServer(models.Model):
                 )  # pylint: disable=no-member
             )
 
+        if sudo and self.use_sudo != sudo:
+            raise ValidationError(
+                _(
+                    "Sudo mode doesn't match for server '%(server)s'.",
+                    server=self.name,
+                )
+            )
+
         # Populate `sudo` value from the server settings if not provided explicitly
         if sudo is None:
             if self.sudo().ssh_username != "root" and self.sudo().use_sudo:

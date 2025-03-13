@@ -761,3 +761,23 @@ COMMAND_RESULT = {
             self.fail(
                 f"Unrestricted command should execute on any server but failed: {e}"
             )
+
+    def test_execute_command_sudo_mode_mismatch(self):
+        """Test command exec raises ValidationError on sudo mode mismatch."""
+        server = self.server_test_1
+        server.write({"use_sudo": "p"})
+        command = self.Command.create(
+            {
+                "name": "Test Command",
+                "action": "ssh_command",
+                "code": "ls -a /tmp",
+            }
+        )
+
+        # Execute the command with sudo parameter 'n' (without password)
+        # This should trigger a ValidationError because 'n'
+        # does not match the server's 'p'
+        with self.assertRaisesRegex(
+            ValidationError, "Sudo mode doesn't match for server"
+        ):
+            server.execute_command(command, sudo="n")

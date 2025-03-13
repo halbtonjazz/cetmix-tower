@@ -175,26 +175,8 @@ class CxTowerCommandExecuteWizard(models.TransientModel):
             "context": context,
         }
 
-    def _check_sudo_mode_match(self):
-        """
-        Checks that the wizard's sudo mode matches the server configuration.
-        """
-        # If the user is in the 'group_user', use sudo rights to read the 'use_sudo'
-        # field since it's normally restricted to 'group_manager'.
-        if self.env.user.has_group("cetmix_tower_server.group_user"):
-            servers = self.server_ids.sudo()
-        else:
-            servers = self.server_ids
-        for server in servers:
-            if self.use_sudo != bool(server.use_sudo):
-                raise ValidationError(
-                    _(f"Sudo mode doesn't match for server {server.name}.")
-                )
-
     def execute_command_on_server(self):
         """Render selected command rendered using server method"""
-
-        self._check_sudo_mode_match()
         # Check if command is selected
         if not self.command_id:
             raise ValidationError(_("Please select a command to execute"))
@@ -208,7 +190,7 @@ class CxTowerCommandExecuteWizard(models.TransientModel):
         for server in self.server_ids:
             server.execute_command(
                 self.command_id,
-                sudo=server.use_sudo,
+                sudo=server.use_sudo if self.use_sudo else None,
                 path=path_value,
                 **custom_values,
             )
@@ -225,7 +207,6 @@ class CxTowerCommandExecuteWizard(models.TransientModel):
         """
         Executes a given code as is in wizard
         """
-        self._check_sudo_mode_match()
         # Check if multiple servers are selected
         if len(self.server_ids) > 1:
             raise ValidationError(
@@ -290,7 +271,7 @@ class CxTowerCommandExecuteWizard(models.TransientModel):
                     server._get_ssh_client(raise_on_error=True),
                     self.rendered_code,
                     self.path or None,
-                    sudo=server.use_sudo if server.use_sudo else None,
+                    sudo=server.use_sudo if self.use_sudo else None,
                     **kwargs,
                 )
             command_error = command_result["error"]
